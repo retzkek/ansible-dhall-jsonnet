@@ -5,8 +5,9 @@ probably some less-than-best-practices. I also haven't actually tried running
 the generated playbooks (but I did sytax-check them).
 
 The original YAML config, which runs a system update procedure, is in
-`update_original.yaml`. Jsonnet output is in `update_jsonnet.json`. Dhall output
-is in `update_dhall.yaml`, and for sake of comparison with jsonnet
+`update_original.yaml`. Jsonnet input is in `update.jsonnet` and output is in
+`update_jsonnet.json`. Dhall input in `update.dhall` and output is in
+`update_dhall.yaml`, and for sake of comparison with jsonnet
 `update_jsonnet.json`.
 
 There are two differences betwen the dhall and jsonnet playbooks, both caused by
@@ -14,6 +15,97 @@ the flexibility of Ansible allowing a field to be either a list of strings or
 just a string when there's only one item (I'm not sure if that's universally
 true or just for these options). It looks like dhall supports union types, so
 this could probably be handled in the type library.
+
+# Comparison
+
+For a quick comparison, here are the "main" playbook files.
+
+## YAML
+
+``` yaml
+- hosts: all
+  remote_user: root
+  # do one host at a time rather than several in parallel
+  serial: 1
+  tasks:
+  - name: renew kerberos ticket
+    local_action: command kinit -R
+  - name: declare downtime
+    command: set_my_downtime
+  - name: disable puppet
+    command: puppet agent --disable 'kretzke disabling to do docker update'
+  - name: remove yum version lock
+    command: yum versionlock clear
+  - name: yum update
+    yum:
+      name: '*'
+      state: latest
+  - name: enable puppet
+    command: puppet agent --enable
+  - name: run puppet
+    command: puppet agent -t
+    register: result
+    until: result.rc == 0
+    retries: 10
+    delay: 60
+  - name: reboot node
+    reboot:
+      # some nodes can take a _long_ time to reboot
+      reboot_timeout: 3600
+```
+
+## dhall
+
+``` dhall
+let Ansible =
+    -- https://raw.githubusercontent.com/softwarefactory-project/dhall-ansible/master/package.dhall
+      https://raw.githubusercontent.com/retzkek/dhall-ansible/master/package.dhall sha256:50595ec584149cfbdb8f763d629af0315c893f6937a4c2502b425e06372d44d9
+
+let t = ./tasks/package.dhall
+
+let user = env:USER as Text
+
+in  [ Ansible.Play::{
+      , hosts = "all"
+      , remote_user = Some "root"
+      , serial = Some [ "1" ]
+      , tasks = Some
+        [ t.sys.renewTicket
+        , t.sys.declareDowntime
+        , t.puppet.disable "${user} disabling to do docker update"
+        , t.yum.removeVersionLock
+        , t.yum.update
+        , t.puppet.enable
+        , t.puppet.run
+        , t.sys.reboot
+        ]
+      }
+    ]
+
+```
+
+## jsonnet
+
+``` jsonnet
+local t = import 'tasks/package.libsonnet';
+
+function(username='kretzke') [{
+  hosts: 'all',
+  remote_user: 'root',
+  serial: 1,
+  tasks: [
+    t.sys.renewTicket,
+    t.sys.declareDowntime,
+    t.puppet.disable('%s disabling to do docker update' % username),
+    t.yum.removeVersionLock,
+    t.yum.update,
+    t.puppet.enable,
+    t.puppet.run,
+    t.sys.reboot,
+  ],
+}]
+
+```
 
 # Thoughts
 
