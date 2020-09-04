@@ -14,7 +14,7 @@
             "name": "declare downtime"
          },
          {
-            "command": "puppet agent --disable 'ifmon disabling to do docker update'",
+            "command": "puppet agent --disable 'kretzke disabling to do docker update'",
             "name": "disable puppet"
          },
          {
