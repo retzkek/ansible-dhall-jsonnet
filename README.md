@@ -129,7 +129,7 @@ function(username='kretzke') [{
   
 # Conclusion
 
-Comparing dhall and jsonnet is like comparing haskell and python: do you want
-the guarantees of type safety, or the productivity of a dynamic language? Either
-is better than plain YAML!
+Comparing dhall and jsonnet is like comparing haskell and ~python~ lisp: do you
+want the guarantees of type safety, or the productivity of a dynamic language?
+Either is better than plain YAML (or python, down with significant whitespace)!
 
