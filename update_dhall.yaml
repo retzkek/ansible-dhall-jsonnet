@@ -1,0 +1,31 @@
+
+- hosts: all
+  remote_user: root
+  serial:
+    - '1'
+  tasks:
+    - command: kinit -R
+      delegate_to: '127.0.0.1'
+      name: renew kerberos ticket
+    - command: set_my_downtime
+      name: declare downtime
+    - command: "puppet agent --disable 'kretzke disabling to do docker update'"
+      name: disable puppet
+    - command: yum versionlock clear
+      name: remove yum version lock
+    - name: yum update
+      yum:
+        name:
+          - "*"
+        state: latest
+    - command: puppet agent --enable
+      name: enable puppet
+    - command: puppet agent -t
+      delay: 60
+      name: run puppet
+      register: result
+      retries: 10
+      until: result.rc == 0
+    - name: reboot node
+      reboot:
+        reboot_timeout: 3600
